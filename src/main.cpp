@@ -95,20 +95,6 @@ int main(int argc, char *argv[])
     bpp::ParameterList parametersToIgnore;
     bpp::TreeTemplate<bpp::Node> *tree = bpp::OptimizationTools::buildDistanceTree(distEstimation, *distMethod, parametersToIgnore);
 
-    // bool optimizeBrLen = false;
-    // std::string param = bpp::OptimizationTools::DISTANCEMETHOD_INIT;
-    // double tolerance = 0.000001;
-    // unsigned int tlEvalMax = 1000000;
-    // unsigned int verbose = 4;
-    // bpp::TreeTemplate<bpp::Node> *tree = bpp::OptimizationTools::buildDistanceTree(distEstimation, *distMethod, parametersToIgnore,
-    //                                                                                optimizeBrLen,
-    //                                                                                param,
-    //                                                                                tolerance,
-    //                                                                                tlEvalMax,
-    //                                                                                0,
-    //                                                                                0,
-    //                                                                                verbose);
-
     // Optimize likelihood on this tree
 
     /* Convert Tree in PhyloTree */
