@@ -13,7 +13,7 @@ find_package (bpp-seq3 1.0.0 REQUIRED)
 find_package (bpp-phyl3 1.0.0 REQUIRED)
 
 # add the executable
-add_executable(ml-arn src/main.cpp)
+add_executable(ml-arn src/main.cpp src/analysis.cpp)
 
 # link to libraries
 target_link_libraries(ml-arn ${BPP_LIBS_SHARED})
