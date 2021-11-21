@@ -1,9 +1,9 @@
 #!/bin/bash
-sed -r 's/, complete genome//' sarbecoviruses_raw.fasta >sarbecoviruses_1
-sed '/^[^>]/s/T/U/g' sarbecoviruses_1 >sarbecoviruses.fasta
-# sed -r 's/, complete genome//' sarbecoviruses_raw.fasta >sarbecoviruses.fasta
-mafft sarbecoviruses.fasta > sarbecoviruses_raw.aln
-sed '/^[^>]/s/-/n/g' sarbecoviruses_raw.aln >sarbecoviruses.aln
-rm sarbecoviruses_1
-rm sarbecoviruses.fasta
-rm sarbecoviruses_raw.aln
+sed -r 's/, complete genome//' $1.fasta >$1_1
+sed '/^[^>]/s/T/U/g' $1_1 >$1_processed.fasta
+# sed -r 's/, complete genome//' $1_raw.fasta >$1.fasta
+mafft $1_processed.fasta > $1_raw.aln
+sed '/^[^>]/s/-/n/g' $1_raw.aln >$1.aln
+rm $1_1
+rm $1_processed.fasta
+rm $1_raw.aln

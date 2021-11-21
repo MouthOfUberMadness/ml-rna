@@ -23,12 +23,9 @@
 #include <Bpp/Phyl/Io/Newick.h>
 #include <Bpp/Phyl/Io/BppOSubstitutionModelFormat.h>
 
-int main(int argc, char *argv[])
+void buildPhylogeneticTreeFromAlignement(const std::string &filename)
 {
-    std::string nameSeq = "../data/sarbecoviruses.aln";
-    // std::string nameSeq = "../data/lysozymeLarge.fasta";
-    // std::string nameSeq = "../data/lysozymeLargeGaps.fasta";
-    // std::string nameSeq = "../data/lysozymeLarge1Gap.fasta";
+    std::string nameSeq = filename;
     bpp::Fasta Fst;
 
     auto alpha = std::make_shared<bpp::RNA>();
@@ -37,49 +34,6 @@ int main(int argc, char *argv[])
 
     auto model = std::make_shared<bpp::T92>(alpha.get(), 3., .1);
 
-    auto cast1 = dynamic_cast<bpp::AbstractReversibleNucleotideSubstitutionModel *>(model.get());
-    if (cast1 != nullptr)
-    {
-        std::cout << "Cast1 succeeded" << std::endl;
-        auto cast2 = dynamic_cast<bpp::NucleotideReversibleSubstitutionModel *>(model.get());
-        if (cast2 != nullptr)
-        {
-            std::cout << "Cast2 succeeded" << std::endl;
-        }
-        else
-        {
-            std::cout << "Cast2 failed" << std::endl;
-        }
-
-        auto cast3 = dynamic_cast<bpp::ReversibleSubstitutionModel *>(cast1);
-        if (cast3 != nullptr)
-        {
-            std::cout << "Cast3 succeeded" << std::endl;
-            auto cast4 = dynamic_cast<bpp::NucleotideReversibleSubstitutionModel *>(cast3);
-            if (cast4 != nullptr)
-            {
-                std::cout << "Cast4 succeeded" << std::endl;
-            }
-            else
-            {
-                std::cout << "Cast4 failed" << std::endl;
-            }
-        }
-        else
-        {
-            std::cout << "Cast3 failed" << std::endl;
-        }
-    }
-    else
-    {
-        std::cout << "Cast1 failed" << std::endl;
-    }
-
-    // return 0;
-
-    // auto modelBase = std::make_shared<bpp::T92>(alpha.get(), 3., .1);
-    // auto model = std::make_shared<bpp::RE08Nucleotide>(reinterpret_cast<bpp::NucleotideReversibleSubstitutionModel *>(modelBase.get()));
-    std::cout << "Construct done." << std::endl;
     auto rdist = std::make_shared<bpp::ConstantRateDistribution>();
 
     auto rootFreqs = std::make_shared<bpp::GCFrequencySet>(alpha.get());
@@ -93,7 +47,19 @@ int main(int argc, char *argv[])
 
     // Build tree
     bpp::ParameterList parametersToIgnore;
-    bpp::TreeTemplate<bpp::Node> *tree = bpp::OptimizationTools::buildDistanceTree(distEstimation, *distMethod, parametersToIgnore);
+    bool optimizeBrLen = false;
+    std::string param = bpp::OptimizationTools::DISTANCEMETHOD_INIT;
+    double tolerance = 0.000001;
+    unsigned int tlEvalMax = 1000000;
+    unsigned int verbose = 1;
+    bpp::TreeTemplate<bpp::Node> *tree = bpp::OptimizationTools::buildDistanceTree(distEstimation, *distMethod, parametersToIgnore,
+                                                                                   optimizeBrLen,
+                                                                                   param,
+                                                                                   tolerance,
+                                                                                   tlEvalMax,
+                                                                                   0,
+                                                                                   0,
+                                                                                   verbose);
 
     // Optimize likelihood on this tree
 
@@ -131,7 +97,46 @@ int main(int argc, char *argv[])
     subProc->getParameters().printParameters(cout);
 
     bpp::Newick treeWriter;
-    treeWriter.writePhyloTree(parTree, "sarbecoviruses_optim.dnd");
-    treeWriter.writeTree(*tree, "sarbecoviruses.dnd");
-    return 0;
+    size_t lastindex = filename.find_last_of(".");
+    std::string rawname = filename.substr(0, lastindex);
+    treeWriter.writePhyloTree(parTree, rawname + std::string(".dnd"));
+    treeWriter.writeTree(*tree, rawname + std::string("_unoptim.dnd"));
+}
+
+void analysePhylogeneticTree(const std::string &filename)
+{
+    size_t lastindex = filename.find_last_of(".");
+    std::string rawname = filename.substr(0, lastindex);
+    std::string sequencesName = rawname + std::string(".aln");
+
+    bpp::Newick treeIO;
+    auto phyloTree = treeIO.readPhyloTree(filename);
+
+    bpp::Fasta Fst;
+    auto alpha = std::make_shared<bpp::RNA>();
+    auto sites = std::shared_ptr<bpp::AlignedSequenceContainer>(Fst.readAlignment(sequencesName, alpha.get()));
+}
+
+int main(int argc, char *argv[])
+{
+    std::string filename;
+    std::string option;
+    if (argc == 3)
+    {
+        option = argv[1];
+        filename = argv[2];
+    }
+    else
+    {
+        return 0;
+    }
+
+    if (option == "--build-phyl")
+    {
+        buildPhylogeneticTreeFromAlignement(filename);
+    }
+    else if (option == "--analyse-phyl")
+    {
+        analysePhylogeneticTree(filename);
+    }
 }
