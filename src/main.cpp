@@ -3,140 +3,120 @@
 #include <iomanip>
 #include <iostream>
 
-#include <Bpp/Seq/Io/Fasta.h>
 #include <Bpp/Seq/Alphabet/RNA.h>
 #include <Bpp/Seq/Container/SiteContainerTools.h>
+#include <Bpp/Seq/Io/Fasta.h>
 
+#include <Bpp/Phyl/Distance/BioNJ.h>
+#include <Bpp/Phyl/Distance/DistanceEstimation.h>
+#include <Bpp/Phyl/Model/FrequencySet/NucleotideFrequencySet.h>
 #include <Bpp/Phyl/Model/Nucleotide/T92.h>
 #include <Bpp/Phyl/Model/RE08.h>
-#include <Bpp/Phyl/Model/FrequencySet/NucleotideFrequencySet.h>
 #include <Bpp/Phyl/Model/RateDistribution/ConstantRateDistribution.h>
-#include <Bpp/Phyl/Distance/DistanceEstimation.h>
-#include <Bpp/Phyl/Distance/BioNJ.h>
 #include <Bpp/Phyl/OptimizationTools.h>
 #include <Bpp/Phyl/Tree/PhyloTreeTools.h>
 
-#include <Bpp/Phyl/Likelihood/ParametrizablePhyloTree.h>
-#include <Bpp/Phyl/Likelihood/NonHomogeneousSubstitutionProcess.h>
 #include <Bpp/Phyl/Likelihood/DataFlow/LikelihoodCalculationSingleProcess.h>
+#include <Bpp/Phyl/Likelihood/NonHomogeneousSubstitutionProcess.h>
+#include <Bpp/Phyl/Likelihood/ParametrizablePhyloTree.h>
 
-#include <Bpp/Phyl/Io/Newick.h>
 #include <Bpp/Phyl/Io/BppOSubstitutionModelFormat.h>
+#include <Bpp/Phyl/Io/Newick.h>
 
-void buildPhylogeneticTreeFromAlignement(const std::string &filename)
-{
-    std::string nameSeq = filename;
-    bpp::Fasta Fst;
+#include "analysis.h"
 
-    auto alpha = std::make_shared<bpp::RNA>();
+void buildPhylogeneticTreeFromAlignement(const std::string &filename) {
+  std::string nameSeq = filename;
+  bpp::Fasta Fst;
 
-    auto sites = std::shared_ptr<bpp::AlignedSequenceContainer>(Fst.readAlignment(nameSeq, alpha.get()));
+  auto alpha = std::make_shared<bpp::RNA>();
 
-    auto model = std::make_shared<bpp::T92>(alpha.get(), 3., .1);
+  auto sites = std::shared_ptr<bpp::AlignedSequenceContainer>(
+      Fst.readAlignment(nameSeq, alpha.get()));
 
-    auto rdist = std::make_shared<bpp::ConstantRateDistribution>();
+  auto model = std::make_shared<bpp::T92>(alpha.get(), 3., .1);
 
-    auto rootFreqs = std::make_shared<bpp::GCFrequencySet>(alpha.get());
+  auto rdist = std::make_shared<bpp::ConstantRateDistribution>();
 
-    // Compute ML distance between sequences
-    bpp::DistanceEstimation distEstimation(model, rdist, sites.get(), 1, false);
+  auto rootFreqs = std::make_shared<bpp::GCFrequencySet>(alpha.get());
 
-    // Method of clustering
-    auto distMethod = std::make_shared<bpp::BioNJ>();
-    distMethod->outputPositiveLengths(true);
+  // Compute ML distance between sequences
+  bpp::DistanceEstimation distEstimation(model, rdist, sites.get(), 1, false);
 
-    // Build tree
-    bpp::ParameterList parametersToIgnore;
-    bool optimizeBrLen = false;
-    std::string param = bpp::OptimizationTools::DISTANCEMETHOD_INIT;
-    double tolerance = 0.000001;
-    unsigned int tlEvalMax = 1000000;
-    unsigned int verbose = 1;
-    bpp::TreeTemplate<bpp::Node> *tree = bpp::OptimizationTools::buildDistanceTree(distEstimation, *distMethod, parametersToIgnore,
-                                                                                   optimizeBrLen,
-                                                                                   param,
-                                                                                   tolerance,
-                                                                                   tlEvalMax,
-                                                                                   0,
-                                                                                   0,
-                                                                                   verbose);
+  // Method of clustering
+  auto distMethod = std::make_shared<bpp::BioNJ>();
+  distMethod->outputPositiveLengths(true);
 
-    // Optimize likelihood on this tree
+  // Build tree
+  bpp::ParameterList parametersToIgnore;
+  bool optimizeBrLen = false;
+  std::string param = bpp::OptimizationTools::DISTANCEMETHOD_INIT;
+  double tolerance = 0.000001;
+  unsigned int tlEvalMax = 1000000;
+  unsigned int verbose = 1;
+  bpp::TreeTemplate<bpp::Node> *tree =
+      bpp::OptimizationTools::buildDistanceTree(
+          distEstimation, *distMethod, parametersToIgnore, optimizeBrLen, param,
+          tolerance, tlEvalMax, 0, 0, verbose);
 
-    /* Convert Tree in PhyloTree */
-    auto phyloT = bpp::PhyloTreeTools::buildFromTreeTemplate(*tree);
-    bpp::ParametrizablePhyloTree parTree(*phyloT);
+  // Optimize likelihood on this tree
 
-    /* Create Substitution Process */
-    auto subProc = bpp::NonHomogeneousSubstitutionProcess::createHomogeneousSubstitutionProcess(model, rdist, &parTree, rootFreqs);
+  /* Convert Tree in PhyloTree */
+  auto phyloT = bpp::PhyloTreeTools::buildFromTreeTemplate(*tree);
+  bpp::ParametrizablePhyloTree parTree(*phyloT);
 
-    /* Put objects in DataFlow */
-    bpp::Context context;
-    auto lik = std::make_shared<bpp::LikelihoodCalculationSingleProcess>(context, *sites, *subProc);
+  /* Create Substitution Process */
+  auto subProc = bpp::NonHomogeneousSubstitutionProcess::
+      createHomogeneousSubstitutionProcess(model, rdist, &parTree, rootFreqs);
 
-    bpp::SingleProcessPhyloLikelihood ntl(context, lik);
+  /* Put objects in DataFlow */
+  bpp::Context context;
+  auto lik = std::make_shared<bpp::LikelihoodCalculationSingleProcess>(
+      context, *sites, *subProc);
 
-    std::cout << std::endl
-              << std::endl;
-    std::cout << "Initial value " << ntl.getValue() << std::endl;
-    bpp::OutputStream *profiler = new bpp::StlOutputStream(new std::ofstream("profile.txt", ios::out));
-    bpp::OutputStream *messenger = new bpp::StlOutputStream(new std::ofstream("messages.txt", ios::out));
+  bpp::SingleProcessPhyloLikelihood ntl(context, lik);
 
-    bpp::OptimizationTools::optimizeNumericalParameters2(ntl, ntl.getParameters(), 0,
-                                                         0.0001, 10000, messenger, profiler, false, false, 1,
-                                                         bpp::OptimizationTools::OPTIMIZATION_NEWTON);
+  std::cout << std::endl << std::endl;
+  std::cout << "Initial value " << ntl.getValue() << std::endl;
+  bpp::OutputStream *profiler =
+      new bpp::StlOutputStream(new std::ofstream("profile.txt", ios::out));
+  bpp::OutputStream *messenger =
+      new bpp::StlOutputStream(new std::ofstream("messages.txt", ios::out));
 
-    std::cout << "Final value " << ntl.getValue() << std::endl;
+  bpp::OptimizationTools::optimizeNumericalParameters2(
+      ntl, ntl.getParameters(), 0, 0.0001, 10000, messenger, profiler, false,
+      false, 1, bpp::OptimizationTools::OPTIMIZATION_NEWTON);
 
-    ntl.getParameters().printParameters(cout);
+  std::cout << "Final value " << ntl.getValue() << std::endl;
 
-    /* Update Substitution Process parameters */
+  ntl.getParameters().printParameters(cout);
 
-    subProc->matchParametersValues(ntl.getParameters());
+  /* Update Substitution Process parameters */
 
-    subProc->getParameters().printParameters(cout);
+  subProc->matchParametersValues(ntl.getParameters());
 
-    bpp::Newick treeWriter;
-    size_t lastindex = filename.find_last_of(".");
-    std::string rawname = filename.substr(0, lastindex);
-    treeWriter.writePhyloTree(parTree, rawname + std::string(".dnd"));
-    treeWriter.writeTree(*tree, rawname + std::string("_unoptim.dnd"));
+  subProc->getParameters().printParameters(cout);
+
+  bpp::Newick treeWriter;
+  size_t lastindex = filename.find_last_of(".");
+  std::string rawname = filename.substr(0, lastindex);
+  treeWriter.writePhyloTree(parTree, rawname + std::string(".dnd"));
+  treeWriter.writeTree(*tree, rawname + std::string("_unoptim.dnd"));
 }
 
-void analysePhylogeneticTree(const std::string &filename)
-{
-    size_t lastindex = filename.find_last_of(".");
-    std::string rawname = filename.substr(0, lastindex);
-    std::string sequencesName = rawname + std::string(".aln");
+int main(int argc, char *argv[]) {
+  std::string filename;
+  std::string option;
+  if (argc == 3) {
+    option = argv[1];
+    filename = argv[2];
+  } else {
+    return 0;
+  }
 
-    bpp::Newick treeIO;
-    auto phyloTree = treeIO.readPhyloTree(filename);
-
-    bpp::Fasta Fst;
-    auto alpha = std::make_shared<bpp::RNA>();
-    auto sites = std::shared_ptr<bpp::AlignedSequenceContainer>(Fst.readAlignment(sequencesName, alpha.get()));
-}
-
-int main(int argc, char *argv[])
-{
-    std::string filename;
-    std::string option;
-    if (argc == 3)
-    {
-        option = argv[1];
-        filename = argv[2];
-    }
-    else
-    {
-        return 0;
-    }
-
-    if (option == "--build-phyl")
-    {
-        buildPhylogeneticTreeFromAlignement(filename);
-    }
-    else if (option == "--analyse-phyl")
-    {
-        analysePhylogeneticTree(filename);
-    }
+  if (option == "--build-phyl") {
+    buildPhylogeneticTreeFromAlignement(filename);
+  } else if (option == "--analyse-phyl") {
+    analysePhylogeneticTree(filename);
+  }
 }
