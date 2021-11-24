@@ -34,6 +34,12 @@ void buildPhylogeneticTreeFromAlignement(const std::string &filename) {
   auto sites = std::shared_ptr<bpp::AlignedSequenceContainer>(
       Fst.readAlignment(nameSeq, alpha.get()));
 
+  for (int i = 0; i < sites->getNumberOfSequences(); i++) {
+    bool debug = false;
+    auto name = sites->getSequencesNames()[i];
+    std::cout << "name = " << name << std::endl;
+  }
+
   auto model = std::make_shared<bpp::T92>(alpha.get(), 3., .1);
 
   auto rdist = std::make_shared<bpp::ConstantRateDistribution>();
@@ -53,7 +59,7 @@ void buildPhylogeneticTreeFromAlignement(const std::string &filename) {
   std::string param = bpp::OptimizationTools::DISTANCEMETHOD_INIT;
   double tolerance = 0.000001;
   unsigned int tlEvalMax = 1000000;
-  unsigned int verbose = 1;
+  unsigned int verbose = 2;
   bpp::TreeTemplate<bpp::Node> *tree =
       bpp::OptimizationTools::buildDistanceTree(
           distEstimation, *distMethod, parametersToIgnore, optimizeBrLen, param,
@@ -107,9 +113,11 @@ void buildPhylogeneticTreeFromAlignement(const std::string &filename) {
 int main(int argc, char *argv[]) {
   std::string filename;
   std::string option;
-  if (argc == 3) {
-    option = argv[1];
-    filename = argv[2];
+  std::string readingFrame;
+  if (argc == 4) {
+    readingFrame = argv[1];
+    option = argv[2];
+    filename = argv[3];
   } else {
     return 0;
   }

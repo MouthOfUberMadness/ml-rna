@@ -142,67 +142,24 @@ void toAlignedMapping(const bpp::AlignedSequenceContainer &alignedSequences,
   }
 }
 
-bool findStartingCodon(const bpp::AlignedSequenceContainer &alignedSequences,
-                       size_t seqId, size_t offset, size_t &foundCursor,
-                       size_t &foundIntrisicCursor) {
+size_t findStartingCodon(const bpp::AlignedSequenceContainer &alignedSequences,
+                         size_t seqId) {
   auto alpha = std::make_shared<bpp::RNA>();
   size_t numSites = alignedSequences.getNumberOfSites();
-  size_t intrisicCursor = 0;
-  size_t cursor = 0;
+  std::string aCodon = "AUGGAGAG";
 
-  std::string codon;
-  std::string aCodon = "AUG";
-
-  while (cursor < numSites) {
-
-    bpp::Site site = alignedSequences.getSite(cursor);
-    auto nucleotide = alpha.get()->intToChar(site[seqId]);
-
-    // std::cout << "cursor " << cursor << " " << nucleotide << std::endl;
-
-    if ((nucleotide != "N") && (intrisicCursor >= offset)) {
+  for (size_t i = 0; i < (numSites - aCodon.size()); i++) {
+    std::string codon;
+    for (size_t j = 0; j < aCodon.size(); j++) {
+      bpp::Site site = alignedSequences.getSite(i + j);
+      auto nucleotide = alpha.get()->intToChar(site[seqId]);
       codon.append(nucleotide);
     }
-
-    if (codon.size() == 3) {
-      // std::cout << "codon = " << codon << std::endl;
-      if (codon == aCodon) {
-        foundCursor = cursor + 1;
-        foundIntrisicCursor = intrisicCursor + 1;
-        return true;
-      }
-      codon.clear();
-    }
-
-    if (nucleotide != "N")
-      intrisicCursor++;
-    cursor++;
-  }
-
-  return false;
-}
-
-size_t findReadingFrame(const bpp::AlignedSequenceContainer &alignedSequences,
-                        size_t seqId) {
-  size_t minIntrisicStart = std::numeric_limits<size_t>::max();
-  size_t minStart = 0;
-  size_t minOffset = 0;
-  for (int offset = 0; offset < 3; offset++) {
-    size_t intrisicStart, start;
-    bool found = findStartingCodon(alignedSequences, seqId, offset, start,
-                                   intrisicStart);
-    if (found && (intrisicStart < minIntrisicStart)) {
-      minIntrisicStart = intrisicStart;
-      minStart = start;
-      minOffset = offset;
+    if (codon == aCodon) {
+      return i;
     }
   }
-
-  // std::cout << "offset = " << minOffset
-  //           << " intrisic starting codon position = " << minIntrisicStart
-  //           << " starting codon position = " << minStart << std::endl;
-
-  return minStart;
+  return 0;
 }
 
 template <typename H, typename P>
@@ -249,7 +206,8 @@ void structureAnalysis(const bpp::AlignedSequenceContainer &sites, int offset) {
   int endFCS = 24022 + plusFCS;
   int sizeFCS = endFCS - startFCS;
 
-  int fcsOffset = ((offset < 0) ? -1 : 1) * sizeFCS + offset;
+  int fcsOffsetSign = ((offset < 0) ? -1 : 1);
+  int fcsOffset = ((offset != 0) ? fcsOffsetSign : 0) * sizeFCS + offset;
   // Check Wuhan-Hu-1 S site range
   std::vector<size_t> mapping;
   size_t wuhanHu1SeqId = 0;
@@ -264,7 +222,7 @@ void structureAnalysis(const bpp::AlignedSequenceContainer &sites, int offset) {
             << " end S1 = " << endS1 << " start S2 = " << beginS2
             << " end S2 = " << endS2 << " end = " << end << std::endl;
 
-  size_t window = 20;
+  // size_t window = 20;
   // WindowHistogram gHistogram(numSites, window);
   // WindowHistogram histogram(numSites, window);
   StructuredHistogram gHistogram(0, beginS1, endS1, beginS2, endS2, end);
@@ -286,7 +244,7 @@ void structureAnalysis(const bpp::AlignedSequenceContainer &sites, int offset) {
   // }
   // std::cout << std::endl;
 
-  for (int i = 0; i < numSequences; i++) {
+  for (int i = 1; i < numSequences; i++) {
     bool debug = false;
     auto name = sites.getSequencesNames()[i];
     if (name.rfind("MT835139.1", 0) ==
@@ -295,14 +253,18 @@ void structureAnalysis(const bpp::AlignedSequenceContainer &sites, int offset) {
       debug = true;
     }
 
-    // if (debug || i == 0)
-    //   std::cout << "name = " << name << std::endl;
+    if (debug)
+      std::cout << "name = " << name << std::endl;
 
     histogram.reset();
     supportHistogram.reset();
 
-    size_t readingFrame = findReadingFrame(sites, i);
-    bool found = processSequence(sites, patternList, histogram,
+    size_t readingFrame = findStartingCodon(sites, i);
+
+    if (debug)
+      std::cout << "reading frame = " << readingFrame << std::endl;
+
+    bool found = processSequence(sites, duetPatternList, histogram,
                                  supportHistogram, i, readingFrame);
 
     if (i == 0 && false) {
@@ -334,6 +296,7 @@ void analysePhylogeneticTree(const std::string &filename) {
   auto sites = std::shared_ptr<bpp::AlignedSequenceContainer>(
       Fst.readAlignment(sequencesName, alpha.get()));
 
-  for (int i = 0; i < 100; i++)
-    structureAnalysis(*sites, -2 * i);
+  // for (int i = 0; i < 100; i++)
+  //   structureAnalysis(*sites, -2 * i);
+  structureAnalysis(*sites, 0);
 }
