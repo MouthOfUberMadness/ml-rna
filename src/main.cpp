@@ -114,10 +114,18 @@ int main(int argc, char *argv[]) {
   std::string filename;
   std::string option;
   std::string readingFrame;
-  if (argc == 4) {
+  std::string startS1;
+  std::string endS1;
+  std::string startS2;
+  std::string endS2;
+  if (argc == 8) {
     readingFrame = argv[1];
-    option = argv[2];
-    filename = argv[3];
+    startS1 = argv[2];
+    endS1 = argv[3];
+    startS2 = argv[4];
+    endS2 = argv[5];
+    option = argv[6];
+    filename = argv[7];
   } else {
     return 0;
   }
@@ -125,6 +133,8 @@ int main(int argc, char *argv[]) {
   if (option == "--build-phyl") {
     buildPhylogeneticTreeFromAlignement(filename);
   } else if (option == "--analyse-phyl") {
-    analysePhylogeneticTree(filename);
+    analysePhylogeneticTree(filename, std::stoi(readingFrame),
+                            std::stoi(startS1), std::stoi(endS1),
+                            std::stoi(startS2), std::stoi(endS2));
   }
 }

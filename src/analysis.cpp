@@ -196,39 +196,28 @@ bool processSequence(const bpp::AlignedSequenceContainer &alignedSequences,
   return found;
 }
 
-void structureAnalysis(const bpp::AlignedSequenceContainer &sites, int offset) {
+void structureAnalysis(const bpp::AlignedSequenceContainer &sites,
+                       size_t startCodon, size_t startS1, size_t endS1,
+                       size_t startS2, size_t endS2, int offset) {
   size_t numSequences = sites.getNumberOfSequences();
   size_t numSites = sites.getNumberOfSites();
 
-  int plusFCS = 5;
-  int minusFCS = 5;
-  int startFCS = 24004 - minusFCS;
-  int endFCS = 24022 + plusFCS;
-  int sizeFCS = endFCS - startFCS;
+  int sizeFCS = startS2 - endS1;
 
   int fcsOffsetSign = ((offset < 0) ? -1 : 1);
   int fcsOffset = ((offset != 0) ? fcsOffsetSign : 0) * sizeFCS + offset;
-  // Check Wuhan-Hu-1 S site range
-  std::vector<size_t> mapping;
-  size_t wuhanHu1SeqId = 0;
-  toAlignedMapping(sites, wuhanHu1SeqId, mapping);
-  size_t rawBeginS = 21563, rawEndS = 25384;
-  size_t beginS1 = mapping[rawBeginS];
-  size_t endS1 = startFCS + fcsOffset;
-  size_t beginS2 = endFCS + fcsOffset;
-  size_t endS2 = mapping[rawEndS];
   size_t end = numSites - 1;
-  std::cout << "start = " << 0 << " start S1 = " << beginS1
-            << " end S1 = " << endS1 << " start S2 = " << beginS2
+  std::cout << "start = " << 0 << " start S1 = " << startS1
+            << " end S1 = " << endS1 << " start S2 = " << startS2
             << " end S2 = " << endS2 << " end = " << end << std::endl;
 
   // size_t window = 20;
   // WindowHistogram gHistogram(numSites, window);
   // WindowHistogram histogram(numSites, window);
-  StructuredHistogram gHistogram(0, beginS1, endS1, beginS2, endS2, end);
-  StructuredHistogram gSupportHistogram(0, beginS1, endS1, beginS2, endS2, end);
-  StructuredHistogram histogram(0, beginS1, endS1, beginS2, endS2, end);
-  StructuredHistogram supportHistogram(0, beginS1, endS1, beginS2, endS2, end);
+  StructuredHistogram gHistogram(0, startS1, endS1, startS2, endS2, end);
+  StructuredHistogram gSupportHistogram(0, startS1, endS1, startS2, endS2, end);
+  StructuredHistogram histogram(0, startS1, endS1, startS2, endS2, end);
+  StructuredHistogram supportHistogram(0, startS1, endS1, startS2, endS2, end);
 
   std::array<std::string, 6> listR = {"CGU", "CGC", "CGA", "CGG", "AGA", "AGG"};
   std::array<std::string, 6> listA = {"UUA", "UUG", "CUU", "CUC", "CUA", "CUG"};
@@ -259,12 +248,12 @@ void structureAnalysis(const bpp::AlignedSequenceContainer &sites, int offset) {
     histogram.reset();
     supportHistogram.reset();
 
-    size_t readingFrame = findStartingCodon(sites, i);
+    size_t readingFrame = startCodon;
 
     if (debug)
       std::cout << "reading frame = " << readingFrame << std::endl;
 
-    bool found = processSequence(sites, duetPatternList, histogram,
+    bool found = processSequence(sites, patternList, histogram,
                                  supportHistogram, i, readingFrame);
 
     if (i == 0 && false) {
@@ -283,7 +272,9 @@ void structureAnalysis(const bpp::AlignedSequenceContainer &sites, int offset) {
   std::cout << std::endl;
 }
 
-void analysePhylogeneticTree(const std::string &filename) {
+void analysePhylogeneticTree(const std::string &filename, size_t startCodon,
+                             size_t startS1, size_t endS1, size_t startS2,
+                             size_t endS2) {
   size_t lastindex = filename.find_last_of(".");
   std::string rawname = filename.substr(0, lastindex);
   std::string sequencesName = rawname + std::string(".aln");
@@ -298,5 +289,5 @@ void analysePhylogeneticTree(const std::string &filename) {
 
   // for (int i = 0; i < 100; i++)
   //   structureAnalysis(*sites, -2 * i);
-  structureAnalysis(*sites, 0);
+  structureAnalysis(*sites, startCodon, startS1, endS1, startS2, endS2, 0);
 }
