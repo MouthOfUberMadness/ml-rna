@@ -34,7 +34,7 @@ void buildPhylogeneticTreeFromAlignement(const std::string &filename) {
   auto sites = std::shared_ptr<bpp::AlignedSequenceContainer>(
       Fst.readAlignment(nameSeq, alpha.get()));
 
-  for (int i = 0; i < sites->getNumberOfSequences(); i++) {
+  for (size_t i = 0; i < sites->getNumberOfSequences(); i++) {
     bool debug = false;
     auto name = sites->getSequencesNames()[i];
     std::cout << "name = " << name << std::endl;

@@ -162,35 +162,79 @@ size_t findStartingCodon(const bpp::AlignedSequenceContainer &alignedSequences,
   return 0;
 }
 
+bool matchesWildcard(const std::string &s1, const std::string &s2) {
+  int size = std::min(s1.size(), s2.size());
+  for (int i = 0; i < size; i++) {
+    if ((s1[i] != s2[i]) && (s1[i] != 'X') && (s2[i] != 'X')) {
+      return false;
+    }
+  }
+  return true;
+}
+
 template <typename H, typename P>
 bool processSequence(const bpp::AlignedSequenceContainer &alignedSequences,
                      const P &patternList, H &histogram, H &supportHistogram,
                      size_t seqId, size_t readingFrame) {
   bool found = false;
   auto alpha = std::make_shared<bpp::RNA>();
-  std::string pattern;
   size_t cursor = readingFrame;
   size_t numSites = alignedSequences.getNumberOfSites();
+  size_t fullStrideSize = 3; // Codon sized stride
+  size_t fullBufferSize = patternList.front().size();
 
+  // numSites = 400;
   while (cursor < numSites) {
-    bpp::Site site = alignedSequences.getSite(cursor);
-    if (seqId < site.size()) {
+
+    std::string buffer;
+    bool isBufferFull = false;
+    size_t internalCursor = cursor;
+
+    // Fill the buffer starting from "cursor".
+    while (!isBufferFull && (internalCursor < numSites)) {
+      bpp::Site site = alignedSequences.getSite(internalCursor);
       auto nucleotide = alpha.get()->intToChar(site[seqId]);
+
       if (nucleotide != "N")
-        pattern.append(nucleotide);
+        buffer.append(nucleotide);
+
+      isBufferFull = (buffer.size() == fullBufferSize);
+
+      internalCursor++;
     }
 
-    if (pattern.size() == patternList.front().size()) {
-      if (std::find(patternList.begin(), patternList.end(), pattern) !=
-          patternList.end()) {
-        found = true;
+    if (isBufferFull) {
+      // std::cout << "buffer = " << buffer << " at " << cursor << std::endl;
+
+      // Check if the buffer match the pattern list.
+      auto it = std::find_if(patternList.begin(), patternList.end(),
+                             [&buffer](const std::string &s) {
+                               return matchesWildcard(s, buffer);
+                             });
+      found = it != patternList.end();
+      if (found) {
+        // std::cout << "buffer = " << buffer << " match " << *it << " at "
+        //           << cursor << std::endl;
         histogram.add(cursor);
       }
-      supportHistogram.add(cursor);
-      pattern.clear();
     }
 
-    cursor++;
+    // Take a stride of size 3 ignoring gaps ("N")
+    size_t stride = 0;
+    bool isStrideFull = false;
+    while (!isStrideFull && (cursor < numSites)) {
+      bpp::Site site = alignedSequences.getSite(cursor);
+      auto nucleotide = alpha.get()->intToChar(site[seqId]);
+
+      if (nucleotide != "N") {
+        supportHistogram.add(cursor);
+        stride++;
+      }
+
+      isStrideFull = (stride == fullStrideSize);
+
+      cursor++;
+    }
   }
 
   return found;
@@ -198,14 +242,9 @@ bool processSequence(const bpp::AlignedSequenceContainer &alignedSequences,
 
 void structureAnalysis(const bpp::AlignedSequenceContainer &sites,
                        size_t startCodon, size_t startS1, size_t endS1,
-                       size_t startS2, size_t endS2, int offset) {
+                       size_t startS2, size_t endS2) {
   size_t numSequences = sites.getNumberOfSequences();
   size_t numSites = sites.getNumberOfSites();
-
-  int sizeFCS = startS2 - endS1;
-
-  int fcsOffsetSign = ((offset < 0) ? -1 : 1);
-  int fcsOffset = ((offset != 0) ? fcsOffsetSign : 0) * sizeFCS + offset;
   size_t end = numSites - 1;
   std::cout << "start = " << 0 << " start S1 = " << startS1
             << " end S1 = " << endS1 << " start S2 = " << startS2
@@ -219,21 +258,57 @@ void structureAnalysis(const bpp::AlignedSequenceContainer &sites,
   StructuredHistogram histogram(0, startS1, endS1, startS2, endS2, end);
   StructuredHistogram supportHistogram(0, startS1, endS1, startS2, endS2, end);
 
-  std::array<std::string, 6> listR = {"CGU", "CGC", "CGA", "CGG", "AGA", "AGG"};
-  std::array<std::string, 6> listA = {"UUA", "UUG", "CUU", "CUC", "CUA", "CUG"};
-  std::array<std::string, 6> patternList = listR;
-  std::array<std::string, 36> duetPatternList;
+  std::vector<std::string> listR = {"CGU", "CGC", "CGA", "CGG", "AGA", "AGG"};
+  std::vector<std::string> listA = {"UUA", "UUG", "CUU", "CUC", "CUA", "CUG"};
+  std::vector<std::string> patternList = listR;
 
-  for (int i = 0; i < listR.size(); i++)
-    for (int j = 0; j < listR.size(); j++) {
-      duetPatternList[6 * i + j] = patternList[i] + patternList[j];
+  std::vector<std::string> almostPatternList;
+  for (auto pattern : patternList) {
+    for (size_t i = 0; i < 3; i++) {
+      auto almostPattern = pattern;
+      almostPattern[i] = 'X';
+      almostPatternList.push_back(almostPattern);
     }
-  // for (auto duet : duetPatternList) {
-  //   std::cout << duet << " ";
+  }
+
+  std::vector<std::string> duetPatternList;
+  for (size_t i = 0; i < listR.size(); i++)
+    for (size_t j = 0; j < listR.size(); j++) {
+      duetPatternList.push_back(patternList[i] + std::string("XXX") +
+                                patternList[j]);
+    }
+
+  std::vector<std::string> almostDuetPatternList;
+  for (auto almostPattern : almostPatternList)
+    for (auto pattern : patternList) {
+      almostDuetPatternList.push_back(almostPattern + std::string("XXX") +
+                                      pattern);
+      almostDuetPatternList.push_back(pattern + std::string("XXX") +
+                                      almostPattern);
+    }
+
+  // std::vector<std::string> finalPatternList = almostPatternList;
+  // std::cout << "almost patterns" << std::endl;
+  // for (auto element : almostPatternList) {
+  //   std::cout << element << " ";
   // }
   // std::cout << std::endl;
 
-  for (int i = 1; i < numSequences; i++) {
+  // std::vector<std::string> finalPatternList = duetPatternList;
+  // std::cout << "duet patterns" << std::endl;
+  // for (auto element : duetPatternList) {
+  //   std::cout << element << " ";
+  // }
+  // std::cout << std::endl;
+
+  std::vector<std::string> finalPatternList = almostDuetPatternList;
+  std::cout << "almost duet patterns" << std::endl;
+  // for (auto element : almostDuetPatternList) {
+  //   std::cout << element << " ";
+  // }
+  // std::cout << std::endl;
+
+  for (size_t i = 0; i < numSequences; i++) {
     bool debug = false;
     auto name = sites.getSequencesNames()[i];
     if (name.rfind("MT835139.1", 0) ==
@@ -253,8 +328,8 @@ void structureAnalysis(const bpp::AlignedSequenceContainer &sites,
     if (debug)
       std::cout << "reading frame = " << readingFrame << std::endl;
 
-    bool found = processSequence(sites, patternList, histogram,
-                                 supportHistogram, i, readingFrame);
+    processSequence(sites, finalPatternList, histogram, supportHistogram, i,
+                    readingFrame);
 
     if (i == 0 && false) {
       histogram.print();
@@ -287,7 +362,5 @@ void analysePhylogeneticTree(const std::string &filename, size_t startCodon,
   auto sites = std::shared_ptr<bpp::AlignedSequenceContainer>(
       Fst.readAlignment(sequencesName, alpha.get()));
 
-  // for (int i = 0; i < 100; i++)
-  //   structureAnalysis(*sites, -2 * i);
-  structureAnalysis(*sites, startCodon, startS1, endS1, startS2, endS2, 0);
+  structureAnalysis(*sites, startCodon, startS1, endS1, startS2, endS2);
 }
