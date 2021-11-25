@@ -185,7 +185,6 @@ bool processSequence(const bpp::AlignedSequenceContainer &alignedSequences,
   size_t fullStrideSize = 3; // Codon sized stride
   size_t fullBufferSize = patternLength;
 
-  // numSites = 400;
   while (cursor < numSites) {
 
     std::string buffer;
@@ -216,8 +215,8 @@ bool processSequence(const bpp::AlignedSequenceContainer &alignedSequences,
       //                        });
       found = it != patternList.end();
       if (found) {
-        std::cout << "buffer = " << buffer << " match " << *it << " at "
-                  << cursor << std::endl;
+        // std::cout << "buffer = " << buffer << " match " << *it << " at "
+        //           << cursor << std::endl;
         histogram.add(cursor);
       }
     }
@@ -262,7 +261,7 @@ void structureAnalysis(const bpp::AlignedSequenceContainer &sites,
   StructuredHistogram histogram(0, startS1, endS1, startS2, endS2, end);
   StructuredHistogram supportHistogram(0, startS1, endS1, startS2, endS2, end);
 
-  for (size_t i = 0; i < 1; i++) {
+  for (size_t i = 0; i < numSequences; i++) {
     bool debug = false;
     auto name = sites.getSequencesNames()[i];
     if (name.rfind("MT835139.1", 0) ==
@@ -344,8 +343,8 @@ void analysePhylogeneticTree(const std::string &filename, size_t startCodon,
   computeConsensus(*sites, subSequencesIds);
 
   bool debug = false;
-  auto patterns = getFcsPatterns(FCSPatterns::RXXR, false, debug);
-  // auto patterns = getFcsPatterns(FCSPatterns::RXXR, true, debug);
+  // auto patterns = getFcsPatterns(FCSPatterns::RXXR, false, debug);
+  auto patterns = getFcsPatterns(FCSPatterns::RXXR, true, debug);
   // auto patterns = getFcsPatterns(FCSPatterns::RXRROrRRXR, false, debug);
   // auto patterns = getFcsPatterns(FCSPatterns::RXRROrRRXR, true, debug);
 
