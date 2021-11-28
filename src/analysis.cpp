@@ -209,10 +209,6 @@ bool processSequence(const bpp::AlignedSequenceContainer &alignedSequences,
 
       // Check if the buffer match the pattern list.
       auto it = patternList.find(buffer);
-      // auto it = std::find_if(patternList.begin(), patternList.end(),
-      //                        [&buffer](const std::string &s) {
-      //                          return matchesWildcard(s, buffer);
-      //                        });
       found = it != patternList.end();
       if (found) {
         // std::cout << "buffer = " << buffer << " match " << *it << " at "
@@ -243,6 +239,7 @@ bool processSequence(const bpp::AlignedSequenceContainer &alignedSequences,
 }
 
 void structureAnalysis(const bpp::AlignedSequenceContainer &sites,
+                       int excludeSequence,
                        std::unordered_set<std::string> patterns,
                        size_t patternLength, size_t startCodon, size_t startS1,
                        size_t endS1, size_t startS2, size_t endS2) {
@@ -262,6 +259,10 @@ void structureAnalysis(const bpp::AlignedSequenceContainer &sites,
   StructuredHistogram supportHistogram(0, startS1, endS1, startS2, endS2, end);
 
   for (size_t i = 0; i < numSequences; i++) {
+
+    if ((int)i == excludeSequence)
+      continue;
+
     bool debug = false;
     auto name = sites.getSequencesNames()[i];
     if (name.rfind("MT835139.1", 0) ==
@@ -324,9 +325,9 @@ void computeConsensus(const bpp::AlignedSequenceContainer &sites,
   fasta.writeSequence(outfile, *consensus);
 }
 
-void analysePhylogeneticTree(const std::string &filename, size_t startCodon,
-                             size_t startS1, size_t endS1, size_t startS2,
-                             size_t endS2) {
+void analysePhylogeneticTree(const std::string &filename, int excludeSequence,
+                             size_t startCodon, size_t startS1, size_t endS1,
+                             size_t startS2, size_t endS2) {
   size_t lastindex = filename.find_last_of(".");
   std::string rawname = filename.substr(0, lastindex);
   std::string sequencesName = rawname + std::string(".aln");
@@ -343,11 +344,11 @@ void analysePhylogeneticTree(const std::string &filename, size_t startCodon,
   computeConsensus(*sites, subSequencesIds);
 
   bool debug = false;
-  // auto patterns = getFcsPatterns(FCSPatterns::RXXR, false, debug);
-  auto patterns = getFcsPatterns(FCSPatterns::RXXR, true, debug);
+  auto patterns = getFcsPatterns(FCSPatterns::RXXR, false, debug);
+  // auto patterns = getFcsPatterns(FCSPatterns::RXXR, true, debug);
   // auto patterns = getFcsPatterns(FCSPatterns::RXRROrRRXR, false, debug);
   // auto patterns = getFcsPatterns(FCSPatterns::RXRROrRRXR, true, debug);
 
-  structureAnalysis(*sites, patterns, 3 * 4, startCodon, startS1, endS1,
-                    startS2, endS2);
+  structureAnalysis(*sites, excludeSequence, patterns, 3 * 4, startCodon,
+                    startS1, endS1, startS2, endS2);
 }
